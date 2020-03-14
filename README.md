@@ -16,6 +16,10 @@ Many articles online promote sponsored content without explicitly mentioning it.
 ```
 
 ```
+working
+```
+![Screen Shot 2020-03-14 at 12 40 38 PM](https://user-images.githubusercontent.com/19767662/76675102-0db96900-65f1-11ea-8b01-c6aa65645ab3.png)
+```
 Steps
 ```
 * Change the train-validation file paths based on your system directory.

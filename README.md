@@ -37,6 +37,10 @@ How it works
 * BERT layer is fixed. Only the linear layer weights are adjusted during training.
 
 ```
+Validation
+To be updated(Training in progress)
+```
+```
 Future Enhancements
 ```
 * To be updated.

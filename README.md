@@ -19,6 +19,12 @@ Many articles online promote sponsored content without explicitly mentioning it.
 working
 ```
 ![Screen Shot 2020-03-14 at 12 40 38 PM](https://user-images.githubusercontent.com/19767662/76675102-0db96900-65f1-11ea-8b01-c6aa65645ab3.png)
+
+'[CLS]' must represent sentence embedding, as it always occurs at the start of the sentence, unlike 
+other tokens which appear based on english grammar, and it's attention is calculated with all other tokens of the 
+sentence.
+Since, it is a document classification task, we can safely take an average across all CLS tokens, for a
+document.
 ```
 Steps
 ```

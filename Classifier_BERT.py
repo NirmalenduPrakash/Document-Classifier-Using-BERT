@@ -32,22 +32,24 @@ All promotional articles are labelled 1 and good articles 0
 '''
 with open('/home/svu/e0401988/NLP/classification/train.pkl','rb') as f:
   df=pickle.load(f)
+cls_id= tokenizer.convert_tokens_to_ids('[CLS]')
+df['cls_index']=df['encoding'].apply(lambda x: [1 if tok==cls_id else 0 for tok in x ])
   
-  class ClassifierDataset(Dataset):
+class ClassifierDataset(Dataset):
   def __init__(self,df):
     self.df=df
 
-  def __len__(self):
+  def __len__(self): 
     return len(self.df)
 
   def __getitem__(self,index):
     return torch.tensor(self.df.iloc[index]['encoding']),torch.tensor(self.df.iloc[index]['attn_mask']),\
-        torch.tensor(self.df.iloc[index]['label'])
+      torch.tensor(self.df.iloc[index]['label']),torch.tensor(self.df.iloc[index]['cls_index'])
 
 class DocumentClassifier(nn.Module):
     def __init__(self, freeze_bert = True):
         super(DocumentClassifier, self).__init__()
-        self.bert_layer = bert_model#BertModel.from_pretrained('bert-base-uncased')
+        self.bert_layer = BertModel.from_pretrained('bert-base-uncased')
 
         for p in self.bert_layer.parameters():
             p.requires_grad = False
@@ -56,10 +58,17 @@ class DocumentClassifier(nn.Module):
         self.cls_layer = nn.Linear(768, 1)
         # self.sigmoid=nn.Sigmoid()
 
-    def forward(self, seq, attn_masks):
+    def forward(self, seq, attn_masks,cls_index):
         cont_reps, _ = self.bert_layer(seq, attention_mask = attn_masks)
-        cls_rep = cont_reps[:, 0]
-        logits = self.cls_layer(cls_rep)
+        # print(cont_reps.shape)
+        # cls_rep = cont_reps[:, 0]
+        batch_rep=[]
+        for indx in range(seq.shape[0]):          
+          cls_rep=torch.mean(cont_reps[indx,[i for i in cls_index[indx] if i==1]],dim=0).view(1,-1)        
+          batch_rep.append(cls_rep)
+
+        batch_rep=torch.cat(batch_rep,dim=0)          
+        logits = self.cls_layer(batch_rep)
         return logits
 
 #training and validation dataset        
@@ -89,7 +98,7 @@ def train():
     
     for _e in range(20):
         train_loss=0
-        for t, (seq, attn_mask, labels) in enumerate(train_loader):
+        for t, (seq, attn_mask, labels,cls_index) in enumerate(train_loader):
             # data_batch = sort_batch_by_len(data_dict)
             
             seq=seq.to(device)
@@ -97,14 +106,14 @@ def train():
             labels =labels.to(device) #torch.tensor(data_batch).to(device)
                     
             optimizer.zero_grad()
-            logits=model(seq,attn_mask)
+            logits=model(seq,attn_mask,cls_index)
             loss = criterion(logits.squeeze(-1), labels.float())
             train_loss+=loss.data.item()
             loss.backward()
             optimizer.step()
         train_loss= np.mean(train_loss)
         val_loss=0
-        for t, (seq, attn_mask, labels) in enumerate(val_loader):
+        for t, (seq, attn_mask, labels,cls_index) in enumerate(val_loader):
             # data_batch = sort_batch_by_len(data_dict)
             
             seq=seq.to(device)
@@ -112,7 +121,7 @@ def train():
             labels =labels.to(device) #torch.tensor(data_batch).to(device)
                     
             optimizer.zero_grad()
-            logits=model(seq,attn_mask)
+            logits=model(seq,attn_mask,cls_index)
             loss = criterion(logits.squeeze(-1), labels.float())
             val_loss+=loss.data.item()
         val_loss= np.mean(val_loss)   
@@ -133,9 +142,10 @@ def predict(doc):
         tokens+=['[PAD]' for _ in range(512-len(tokens))]
     else:
         tokens=tokens[:512]
-    attn_mask=torch.tensor([0 if tok=='[PAD]' else 1 for tok in tokens]).to(device)    
+    attn_mask=torch.tensor([0 if tok=='[PAD]' else 1 for tok in tokens]).to(device)
+    cls_mask=torch.tensor([1 if tok==cls_id else 0 for tok in tokens]).to(device)    
     encoded=torch.tensor(tokenizer.convert_tokens_to_ids(tokens)).to(device)
-    output=model(encoded,attn_mask)
+    output=model(encoded,attn_mask,cls_mask)
     return nn.sigmoid(output)>0.5
 
 if  __name__== "__main__:
